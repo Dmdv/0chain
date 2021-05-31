@@ -1,8 +1,10 @@
 package magmasc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"0chain.net/chaincore/chain/state"
 	"0chain.net/chaincore/transaction"
@@ -90,4 +92,15 @@ func createAndInsertConsumerStakePool(consumerID, scKey string, balances state.S
 	}
 
 	return nil
+}
+
+// getAllConsumers represents MagmaSmartContract handler. Returns all registered Consumer's nodes
+// stores in provided state.StateContextI with AllConsumersKey.
+func (msc *MagmaSmartContract) getAllConsumers(_ context.Context, _ url.Values, balances state.StateContextI) (interface{}, error) {
+	consumers, err := extractConsumers(balances)
+	if err != nil {
+		return "", common.NewErrInternal("err while extracting all consumers from state", err.Error())
+	}
+
+	return consumers.Nodes, nil
 }

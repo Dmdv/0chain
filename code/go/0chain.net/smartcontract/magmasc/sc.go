@@ -61,6 +61,7 @@ func (msc *MagmaSmartContract) setSC(sc *sci.SmartContract) {
 	// consumer
 	msc.SmartContractExecutionStats[registerConsumer] = metrics.GetOrRegisterTimer(fmt.Sprintf("sc:%v:func:%v", msc.ID, registerConsumer), nil)
 	msc.SmartContractExecutionStats[acceptTerms] = metrics.GetOrRegisterTimer(fmt.Sprintf("sc:%v:func:%v", msc.ID, acceptTerms), nil)
+	msc.RestHandlers["/getAllConsumers"] = msc.getAllConsumers
 
 	// provider
 	msc.SmartContractExecutionStats[registerProvider] = metrics.GetOrRegisterTimer(fmt.Sprintf("sc:%v:func:%v", msc.ID, registerProvider), nil)
