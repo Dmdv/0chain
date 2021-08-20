@@ -9,10 +9,55 @@ import (
 	"0chain.net/chaincore/state"
 	"0chain.net/chaincore/transaction"
 	"0chain.net/core/common"
+	"0chain.net/core/logging"
 	"0chain.net/core/util"
+	"go.uber.org/zap"
 )
 
 const blobberHealthTime = 60 * 60 // 1 Hour
+
+func (sc *StorageSmartContract) changeStateErrorTest(t *transaction.Transaction, input []byte, balances cstate.StateContextI) (string, error) {
+
+	// get registered blobbers
+	blobbers, err := sc.getBlobbersList(balances)
+	if err != nil {
+		return "", common.NewError("add_or_update_blobber_failed", "Failed to get blobber list: "+err.Error())
+	}
+	logging.Logger.Info("received list of blobbers", zap.String("TRX", t.Hash), zap.Int("node count", len(blobbers.Nodes)))
+
+	// create blobber
+	var blobber = new(StorageNode)
+	if err = blobber.Decode(input); err != nil {
+		return "", common.NewError("add_or_update_blobber_failed", "malformed request: "+err.Error())
+	}
+	logging.Logger.Info("created blobber instance", zap.String("TRX", t.Hash), zap.Int("node count", len(blobbers.Nodes)))
+
+	for _, b := range blobbers.Nodes {
+		if b.ID == blobber.ID || b.BaseURL == blobber.BaseURL {
+			logging.Logger.Info("blobber has been already added", zap.String("TRX", t.Hash), zap.Int("node count", len(blobbers.Nodes)))
+			return "blobber has been already added", nil
+		}
+	}
+
+	blobbers.Nodes.add(blobber)
+	logging.Logger.Info("added blobber to nodes", zap.String("TRX", t.Hash), zap.Int("node count", len(blobbers.Nodes)))
+
+	// save all the blobbers
+	_, err = balances.InsertTrieNode(ALL_BLOBBERS_KEY, blobbers)
+	if err != nil {
+		return "", common.NewError("add_or_update_blobber_failed", "saving all blobbers: "+err.Error())
+	}
+	logging.Logger.Info("all blobbers have been saved to state", zap.String("TRX", t.Hash), zap.Int("node count", len(blobbers.Nodes)))
+
+	// save the blobber
+	_, err = balances.InsertTrieNode(blobber.GetKey(sc.ID), blobber)
+	if err != nil {
+		return "", common.NewError("add_or_update_blobber_failed", "saving blobber: "+err.Error())
+	}
+	logging.Logger.Info("new blobber has been saved to the state", zap.String("TRX", t.Hash), zap.Int("node count", len(blobbers.Nodes)))
+
+	return string(blobber.Encode()), nil
+}
 
 func (sc *StorageSmartContract) getBlobbersList(balances cstate.StateContextI) (*StorageNodes, error) {
 	allBlobbersList := &StorageNodes{}
