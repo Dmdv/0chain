@@ -7,7 +7,45 @@ import (
 	"0chain.net/chaincore/state"
 	"0chain.net/chaincore/transaction"
 	"0chain.net/core/common"
+
+	"0chain.net/core/logging"
+	"go.uber.org/zap"
 )
+
+func (zcn *ZCNSmartContract) changeStateErrorTest(t *transaction.Transaction, _ []byte, balances cstate.StateContextI) (string, error) {
+	ans, err := GetAuthorizerNodes(balances)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("received list of authorizers", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+	if ans.NodeMap[t.ClientID] != nil {
+		err = common.NewError("failed to add authorizer", fmt.Sprintf("authorizer(id: %v) already exists", t.ClientID))
+		return "", err
+	}
+
+	an := GetNewAuthorizer("publicKey", t.ClientID, "localhost")
+	logging.Logger.Info("created authorizer instance", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	err = ans.AddAuthorizer(an)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("added authorizer instance to nodes", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	err = an.Save(balances)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("saved authorizer instance in state", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	err = ans.Save(balances)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("added ALL authorizers instances to state", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	return string(an.Encode()), nil
+}
 
 // AddAuthorizer sc API function
 // Transaction must include ClientID, ToClientID, PublicKey, Hash, Value

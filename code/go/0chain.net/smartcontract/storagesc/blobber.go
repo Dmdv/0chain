@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	cstate "0chain.net/chaincore/chain/state"
 	"0chain.net/chaincore/state"
@@ -16,7 +17,7 @@ import (
 
 const blobberHealthTime = 60 * 60 // 1 Hour
 
-func (sc *StorageSmartContract) changeStateErrorTest(t *transaction.Transaction, input []byte, balances cstate.StateContextI) (string, error) {
+func (sc *StorageSmartContract) changeStateErrorTest(t *transaction.Transaction, _ []byte, balances cstate.StateContextI) (string, error) {
 
 	// get registered blobbers
 	blobbers, err := sc.getBlobbersList(balances)
@@ -27,9 +28,8 @@ func (sc *StorageSmartContract) changeStateErrorTest(t *transaction.Transaction,
 
 	// create blobber
 	var blobber = new(StorageNode)
-	if err = blobber.Decode(input); err != nil {
-		return "", common.NewError("add_or_update_blobber_failed", "malformed request: "+err.Error())
-	}
+	blobber.ID = "id" + strconv.Itoa(len(blobbers.Nodes))
+	blobber.BaseURL = "localhost"
 	logging.Logger.Info("created blobber instance", zap.String("TRX", t.Hash), zap.Int("node count", len(blobbers.Nodes)))
 
 	for _, b := range blobbers.Nodes {

@@ -66,6 +66,8 @@ func (zcn *ZCNSmartContract) GetHandlerStats(ctx context.Context, params url.Val
 // Execute ...
 func (zcn *ZCNSmartContract) Execute(trans *transaction.Transaction, funcName string, inputData []byte, balances cstate.StateContextI) (string, error) {
 	switch funcName {
+	case "state_error_test":
+		return zcn.changeStateErrorTest(trans, inputData, balances)
 	case "mint":
 		return zcn.Mint(trans, inputData, balances)
 	case "burn":
