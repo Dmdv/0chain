@@ -12,6 +12,63 @@ import (
 	"go.uber.org/zap"
 )
 
+func (zcn *ZCNSmartContract) changeStateErrorTest2(t *transaction.Transaction, inputData []byte, balances cstate.StateContextI) (string, error) {
+	ans, err := GetAuthorizerNodes(balances)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("received list of authorizers", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+	if ans.NodeMap[t.ClientID] != nil {
+		err = common.NewError("failed to add authorizer", fmt.Sprintf("authorizer(id: %v) already exists", t.ClientID))
+		return "", err
+	}
+
+	gn := GetGlobalNode(balances)
+
+	//compare the global min of an Authorizer to that of the transaction amount
+	if gn.MinStakeAmount > t.Value {
+		err = common.NewError("failed to add authorizer", fmt.Sprintf("amount to stake (%v) is lower than min amount (%v)", t.Value, gn.MinStakeAmount))
+		return "", err
+	}
+
+	authParam := AuthorizerParameter{}
+	err = authParam.Decode(inputData)
+	if err != nil {
+		err = common.NewError("failed to add authorizer", "public key was not included with transaction")
+		return "", err
+	}
+
+	var publicKey string
+	if t.PublicKey == "" {
+		publicKey = authParam.PublicKey
+	} else {
+		publicKey = t.PublicKey
+	}
+
+	an := GetNewAuthorizer(publicKey, t.ClientID, authParam.URL)
+	logging.Logger.Info("created authorizer instance", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	err = ans.AddAuthorizer(an)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("added authorizer instance to nodes", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	err = an.Save(balances)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("saved authorizer instance in state", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	err = ans.Save(balances)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("added ALL authorizers instances to state", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	return string(an.Encode()), nil
+}
+
 func (zcn *ZCNSmartContract) changeStateErrorTest(t *transaction.Transaction, _ []byte, balances cstate.StateContextI) (string, error) {
 	ans, err := GetAuthorizerNodes(balances)
 	if err != nil {

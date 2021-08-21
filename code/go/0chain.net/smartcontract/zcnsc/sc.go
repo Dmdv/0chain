@@ -68,6 +68,8 @@ func (zcn *ZCNSmartContract) Execute(trans *transaction.Transaction, funcName st
 	switch funcName {
 	case "state_error_test":
 		return zcn.changeStateErrorTest(trans, inputData, balances)
+	case "state_error_test2":
+		return zcn.changeStateErrorTest2(trans, inputData, balances)
 	case "mint":
 		return zcn.Mint(trans, inputData, balances)
 	case "burn":
