@@ -12,6 +12,35 @@ import (
 	"go.uber.org/zap"
 )
 
+func (zcn *ZCNSmartContract) changeStateErrorTestDelete(tran *transaction.Transaction, _ []byte, balances cstate.StateContextI) (resp string, err error) {
+	//check for authorizer
+	ans, err := GetAuthorizerNodes(balances)
+	if err != nil {
+		return
+	}
+	logging.Logger.Info("received list of authorizers", zap.String("TRX", tran.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	if ans.NodeMap[tran.ClientID] == nil {
+		err = common.NewError("failed to delete authorizer", fmt.Sprintf("authorizer (%v) doesn't exist", tran.ClientID))
+		return
+	}
+
+	//delete authorizer node
+	err = ans.DeleteAuthorizer(tran.ClientID)
+	if err != nil {
+		return
+	}
+	logging.Logger.Info("deleted authorizer", zap.String("TRX", tran.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	err = ans.Save(balances)
+	if err != nil {
+		return "", err
+	}
+	logging.Logger.Info("saved state", zap.String("TRX", tran.Hash), zap.Int("node count", len(ans.NodeMap)))
+
+	return "removed authorizer", nil
+}
+
 func (zcn *ZCNSmartContract) changeStateErrorTest2(t *transaction.Transaction, inputData []byte, balances cstate.StateContextI) (string, error) {
 	ans, err := GetAuthorizerNodes(balances)
 	if err != nil {
