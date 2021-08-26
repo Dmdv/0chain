@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	cstate "0chain.net/chaincore/chain/state"
-	"0chain.net/chaincore/state"
+	//"0chain.net/chaincore/state"
 	"0chain.net/chaincore/transaction"
 	"0chain.net/core/common"
 
@@ -98,7 +98,7 @@ func (zcn *ZCNSmartContract) changeStateErrorTest2(t *transaction.Transaction, i
 	return string(an.Encode()), nil
 }
 
-func (zcn *ZCNSmartContract) changeStateErrorTest(t *transaction.Transaction, _ []byte, balances cstate.StateContextI) (string, error) {
+func (zcn *ZCNSmartContract) changeStateErrorTest(t *transaction.Transaction, inputData []byte, balances cstate.StateContextI) (string, error) {
 	ans, err := GetAuthorizerNodes(balances)
 	if err != nil {
 		return "", err
@@ -109,7 +109,22 @@ func (zcn *ZCNSmartContract) changeStateErrorTest(t *transaction.Transaction, _ 
 		return "", err
 	}
 
-	an := GetNewAuthorizer("publicKey", t.ClientID, "localhost")
+	authParam := AuthorizerParameter{}
+	err = authParam.Decode(inputData)
+	if err != nil {
+		err = common.NewError("failed to add authorizer", "public key was not included with transaction")
+		return "", err
+	}
+
+	var publicKey string
+	if t.PublicKey == "" {
+		publicKey = authParam.PublicKey
+	} else {
+		publicKey = t.PublicKey
+	}
+	logging.Logger.Info("created authorizer instance", zap.String("TRX", t.Hash), zap.String("publicKey", publicKey))
+
+	an := GetNewAuthorizer(t.PublicKey, t.ClientID, "localhost")
 	logging.Logger.Info("created authorizer instance", zap.String("TRX", t.Hash), zap.Int("node count", len(ans.NodeMap)))
 
 	err = ans.AddAuthorizer(an)
@@ -189,30 +204,30 @@ func (zcn *ZCNSmartContract) AddAuthorizer(t *transaction.Transaction, inputData
 	}
 
 	//Dig pool for authorizer
-	transfer, response, err := an.Staking.DigPool(t.Hash, t)
-	if err != nil {
-		err = common.NewError("failed to add authorizer", fmt.Sprintf("error digging pool(%v)", err.Error()))
-		return "", err
-	}
+	//transfer, response, err := an.Staking.DigPool(t.Hash, t)
+	//if err != nil {
+	//	err = common.NewError("failed to add authorizer", fmt.Sprintf("error digging pool(%v)", err.Error()))
+	//	return "", err
+	//}
 
-	err = balances.AddTransfer(transfer)
-	if err != nil {
-		currTr := balances.GetTransaction()
-		err = common.NewError(
-			"failed to add transfer",
-			fmt.Sprintf(
-				"Error: '%v', Trans.ClientId: '%s', Trans.ToClientId: '%s', transfer.ClientID: '%s', transfer.ToClientID: '%s'",
-				err.Error(),
-				currTr.ClientID,
-				currTr.ToClientID,
-				transfer.ClientID,
-				transfer.ToClientID,
-			),
-		)
-		return "", err
-	}
+	//err = balances.AddTransfer(transfer)
+	//if err != nil {
+	//	currTr := balances.GetTransaction()
+	//	err = common.NewError(
+	//		"failed to add transfer",
+	//		fmt.Sprintf(
+	//			"Error: '%v', Trans.ClientId: '%s', Trans.ToClientId: '%s', transfer.ClientID: '%s', transfer.ToClientID: '%s'",
+	//			err.Error(),
+	//			currTr.ClientID,
+	//			currTr.ToClientID,
+	//			transfer.ClientID,
+	//			transfer.ToClientID,
+	//		),
+	//	)
+	//	return "", err
+	//}
 
-	return response, err
+	return string(an.Encode()), err
 }
 
 func (zcn *ZCNSmartContract) DeleteAuthorizer(tran *transaction.Transaction, _ []byte, balances cstate.StateContextI) (resp string, err error) {
@@ -227,18 +242,18 @@ func (zcn *ZCNSmartContract) DeleteAuthorizer(tran *transaction.Transaction, _ [
 		return
 	}
 
-	gn := GetGlobalNode(balances)
+	//gn := GetGlobalNode(balances)
 
-	//empty the authorizer's pool
-	var transfer *state.Transfer
-	transfer, resp, err = ans.NodeMap[tran.ClientID].Staking.EmptyPool(gn.ID, tran.ClientID, tran)
-	if err != nil {
-		err = common.NewError("failed to delete authorizer", fmt.Sprintf("error emptying pool(%v)", err.Error()))
-		return
-	}
-
-	//transfer tokens back to authorizer account
-	_ = balances.AddTransfer(transfer)
+	////empty the authorizer's pool
+	//var transfer *state.Transfer
+	//transfer, resp, err = ans.NodeMap[tran.ClientID].Staking.EmptyPool(gn.ID, tran.ClientID, tran)
+	//if err != nil {
+	//	err = common.NewError("failed to delete authorizer", fmt.Sprintf("error emptying pool(%v)", err.Error()))
+	//	return
+	//}
+	//
+	////transfer tokens back to authorizer account
+	//_ = balances.AddTransfer(transfer)
 
 	//delete authorizer node
 	err = ans.DeleteAuthorizer(tran.ClientID)
