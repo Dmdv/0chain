@@ -1,10 +1,8 @@
 package chain
 
 import (
-	"bytes"
 	"container/ring"
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -531,7 +529,7 @@ func (c *Chain) getInitialState(tokens state.Balance) util.Serializable {
 
 /*setupInitialState - setup the initial state based on configuration */
 func (c *Chain) setupInitialState(initStates *state.InitStates) util.MerklePatriciaTrieI {
-	pmt := util.NewMerklePatriciaTrie(c.stateDB, util.Sequence(0))
+	pmt := util.NewMerklePatriciaTrie(c.stateDB, util.Sequence(0), nil)
 	for _, v := range initStates.States {
 		pmt.Insert(util.Path(v.ID), c.getInitialState(v.Tokens))
 	}
@@ -1320,19 +1318,6 @@ func (c *Chain) GetLatestFinalizedBlock() *block.Block {
 	c.lfbMutex.RLock()
 	defer c.lfbMutex.RUnlock()
 	return c.LatestFinalizedBlock
-}
-
-// UpdateLatestFinalizedBlockState updates the latest finalized block's state
-func (c *Chain) UpdateLatestFinalizedBlockState(state util.MerklePatriciaTrieI) error {
-	c.lfbMutex.Lock()
-	defer c.lfbMutex.Unlock()
-	if bytes.Compare(c.LatestFinalizedBlock.ClientStateHash, state.GetRoot()) != 0 {
-		return errors.New("latest finalized block state hash mismatch")
-	}
-
-	c.LatestFinalizedBlock.CreateState(state.GetNodeDB(), state.GetRoot())
-	c.LatestFinalizedBlock.SetStateStatus(block.StateSuccessful)
-	return nil
 }
 
 // GetLatestFinalizedBlockSummary - get the latest finalized block summary.

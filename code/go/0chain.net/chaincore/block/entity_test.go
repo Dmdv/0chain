@@ -1399,7 +1399,7 @@ func TestBlock_SetStateDB_Debug_False(t *testing.T) {
 
 	b := NewBlock("", 1)
 	prevB := NewBlock("", 0)
-	cs := util.NewMerklePatriciaTrie(util.NewMemoryNodeDB(), util.Sequence(b.Round))
+	cs := util.NewMerklePatriciaTrie(util.NewMemoryNodeDB(), util.Sequence(b.Round), nil)
 
 	type fields struct {
 		UnverifiedBlockBody   UnverifiedBlockBody
@@ -2252,7 +2252,9 @@ func TestBlock_ComputeTxnMap(t *testing.T) {
 				MagicBlock:            tt.fields.MagicBlock,
 			}
 
-			b.ComputeTxnMap()
+			b.StartComputeTxnMap()
+			b.mutexTxns.RLock()
+			defer b.mutexTxns.RUnlock()
 			if !reflect.DeepEqual(b.TxnsMap, tt.want) {
 				t.Errorf("ComputeTxnMap() = %v, want %v", b.TxnsMap, tt.want)
 			}
