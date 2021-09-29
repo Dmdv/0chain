@@ -1,15 +1,78 @@
 package zcnsc
 
 import (
-	"fmt"
-
 	cstate "0chain.net/chaincore/chain/state"
 	"0chain.net/chaincore/state"
+	"0chain.net/chaincore/tokenpool"
 	"0chain.net/chaincore/transaction"
 	"0chain.net/core/common"
 	"0chain.net/core/logging"
+	"encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
+
+// Specification:
+// AuthorizerNodes will be read only during `mint` call.
+// `Mint` invokes traversal through the list of authorizers to verify signature.
+// For this reason, to avoid aggressive MPT reads, the list will keep list of authorizers with the following structure: {ID, PK}
+// The full authorizer structure will be stored in MPT.
+// After discussion, it became cleat that to avoid a node failure and loss the info about authorizers,
+// they should be stored in the global state by ID.
+// Also, this means that with time the state will be growing, we can reuse not used authorizers slots for new authorizers.
+
+const (
+	Nodes = "nodes"
+)
+
+var (
+	ErrFailedToAddAuthorizer = errors.New("decoding error")
+)
+
+type (
+
+	// Authorizer is a part of Authorizers MPT node
+	Authorizer struct {
+		PublicKey string `json:"pub_key"`
+		URL       string `json:"url"`
+	}
+
+	// AuthorizerKey is a part of authorizers list in MPT authorizers node
+	AuthorizerKey struct {
+		//ID        string `json:"auth_id"`
+		PublicKey string `json:"pub_key"`
+	}
+
+	// AuthorizerSignature is a part if `MintPayload`
+	AuthorizerSignature struct {
+		ID        string `json:"auth_id"`
+		Signature string `json:"sig"`
+	}
+
+	// AuthorizerInfo stores full info about authorizer
+	AuthorizerInfo struct {
+		ID        string                    `json:"id"`
+		PublicKey string                    `json:"pub_key"`
+		Staking   *tokenpool.ZcnLockingPool `json:"staking"`
+		URL       string                    `json:"url"`
+	}
+)
+
+// AuthorizerNodes stores the list of authorizers
+type AuthorizerNodes struct {
+	Nodes map[string]*AuthorizerInfo `json:"nodes"`
+}
+
+func (pk *Authorizer) Encode() (data []byte, err error) {
+	data, err = json.Marshal(pk)
+	return
+}
+
+func (pk *Authorizer) Decode(input []byte) error {
+	err := json.Unmarshal(input, pk)
+	return err
+}
 
 // AddAuthorizer sc API function
 // Transaction must include ClientID, ToClientID, PublicKey, Hash, Value
@@ -20,13 +83,14 @@ import (
 // ToClient is an SC address
 func (zcn *ZCNSmartContract) AddAuthorizer(tran *transaction.Transaction, inputData []byte, balances cstate.StateContextI) (string, error) {
 	// check for authorizer already there
-	ans, err := GetAuthorizerNodes(balances)
-	logging.Logger.Debug("getting authorizer nodes", zap.String("hash", tran.Hash), zap.Int("nodes count", len(ans.NodeMap)))
+	ans, err := FetchAuthorizers(balances)
+	logging.Logger.Debug("getting authorizer nodes", zap.String("hash", tran.Hash), zap.Int("nodes count", len(ans.Nodes)))
 	if err != nil {
 		return "", err
 	}
 
-	if ans.NodeMap[tran.ClientID] != nil {
+	if ans.Exists(tran.ClientID) {
+		fmt.Errorf("%w: %s", common.ErrDecoding, err)
 		err = common.NewError("failed to add authorizer", fmt.Sprintf("authorizer(id: %v) already exists", tran.ClientID))
 		return "", err
 	}
@@ -44,8 +108,8 @@ func (zcn *ZCNSmartContract) AddAuthorizer(tran *transaction.Transaction, inputD
 		return "", err
 	}
 
-	authParam := AuthorizerParameter{}
-	err = authParam.Decode(inputData)
+	authorizer := Authorizer{}
+	err = authorizer.Decode(inputData)
 	if err != nil {
 		err = common.NewError("failed to add authorizer", "public key was not included with transaction")
 		return "", err
@@ -53,7 +117,7 @@ func (zcn *ZCNSmartContract) AddAuthorizer(tran *transaction.Transaction, inputD
 
 	var publicKey string
 	if tran.PublicKey == "" {
-		publicKey = authParam.PublicKey
+		publicKey = authorizer.PublicKey
 	} else {
 		publicKey = tran.PublicKey
 	}
@@ -61,7 +125,7 @@ func (zcn *ZCNSmartContract) AddAuthorizer(tran *transaction.Transaction, inputD
 	logging.Logger.Debug("trying to add authorizer", zap.String("hash", tran.Hash))
 
 	//Save authorizer
-	an := GetNewAuthorizer(publicKey, tran.ClientID, authParam.URL) // tran.ClientID = authorizer node id
+	an := NewAuthorizerInfo(publicKey, tran.ClientID, authorizer.URL) // tran.ClientID = authorizer node id
 	err = ans.AddAuthorizer(an)
 	if err != nil {
 		return "", err
@@ -109,12 +173,12 @@ func (zcn *ZCNSmartContract) AddAuthorizer(tran *transaction.Transaction, inputD
 
 func (zcn *ZCNSmartContract) DeleteAuthorizer(tran *transaction.Transaction, _ []byte, balances cstate.StateContextI) (resp string, err error) {
 	//check for authorizer
-	ans, err := GetAuthorizerNodes(balances)
+	ans, err := fetchAuthorizers(balances)
 	if err != nil {
 		return
 	}
 
-	if ans.NodeMap[tran.ClientID] == nil {
+	if ans.Nodes[tran.ClientID] == nil {
 		err = common.NewError("failed to delete authorizer", fmt.Sprintf("authorizer (%v) doesn't exist", tran.ClientID))
 		return
 	}
@@ -126,7 +190,7 @@ func (zcn *ZCNSmartContract) DeleteAuthorizer(tran *transaction.Transaction, _ [
 
 	//empty the authorizer's pool
 	var transfer *state.Transfer
-	transfer, resp, err = ans.NodeMap[tran.ClientID].Staking.EmptyPool(gn.ID, tran.ClientID, tran)
+	transfer, resp, err = ans.Nodes[tran.ClientID].Staking.EmptyPool(gn.ID, tran.ClientID, tran)
 	if err != nil {
 		err = common.NewError("failed to delete authorizer", fmt.Sprintf("error emptying pool(%v)", err.Error()))
 		return

@@ -55,13 +55,13 @@ func (zcn *ZCNSmartContract) Mint(trans *transaction.Transaction, inputData []by
 	}
 
 	// get the authorizers
-	ans, err := GetAuthorizerNodes(balances)
+	ans, err := fetchAuthorizers(balances)
 	if err != nil {
 		return
 	}
 
 	// check number of authorizers
-	signaturesNeeded := int(gn.PercentAuthorizers * float64(len(ans.NodeMap)))
+	signaturesNeeded := int(gn.PercentAuthorizers * float64(len(ans.Nodes)))
 	if signaturesNeeded > len(payload.Signatures) {
 		err = common.NewError("failed to mint", fmt.Sprintf("number of authorizers(%v) is lower than need signatures (%v)", len(payload.Signatures), signaturesNeeded))
 		return

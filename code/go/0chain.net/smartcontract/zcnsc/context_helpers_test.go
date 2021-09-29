@@ -39,7 +39,7 @@ func MakeMockStateContext() *mocks.StateContextI {
 
 	// AuthorizerNodes
 	ans := &AuthorizerNodes{}
-	ans.NodeMap = make(map[string]*AuthorizerNode)
+	ans.Nodes = make(map[string]*AuthorizerInfo)
 	for _, authorizer := range authorizers {
 		err := ans.AddAuthorizer(CreateMockAuthorizer(authorizer))
 		if err != nil {
@@ -156,7 +156,7 @@ func MakeMockStateContext() *mocks.StateContextI {
 			})
 
 	ctx.
-		On("InsertTrieNode", mock.AnythingOfType("string"), mock.AnythingOfType("*zcnsc.AuthorizerNode")).
+		On("InsertTrieNode", mock.AnythingOfType("string"), mock.AnythingOfType("*zcnsc.AuthorizerInfo")).
 		Return(
 			func(_ datastore.Key, _ util.Serializable) datastore.Key {
 				return ""

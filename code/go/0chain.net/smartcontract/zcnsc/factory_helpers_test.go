@@ -64,7 +64,7 @@ func CreateTransactionToZcnsc(fromClient string, amount float64) *transaction.Tr
 		Status:                0,
 	}
 
-	publicKey := &AuthorizerParameter{PublicKey: txn.PublicKey, URL: "https://localhost:9876"}
+	publicKey := &Authorizer{PublicKey: txn.PublicKey, URL: "https://localhost:9876"}
 	pkBytes, err := json.Marshal(publicKey)
 	if err != nil {
 		panic(err.Error())
@@ -75,8 +75,8 @@ func CreateTransactionToZcnsc(fromClient string, amount float64) *transaction.Tr
 	return txn
 }
 
-func CreateAuthorizerParam() *AuthorizerParameter {
-	return &AuthorizerParameter{
+func CreateAuthorizerParam() *Authorizer {
+	return &Authorizer{
 		PublicKey: "public key",
 		URL:       "http://localhost:2344",
 	}
@@ -160,9 +160,9 @@ func createUserNode(id string, nonce int64) *UserNode {
 	}
 }
 
-func CreateMockAuthorizer(clientId string) *AuthorizerNode {
+func CreateMockAuthorizer(clientId string) *AuthorizerInfo {
 	tr := CreateTransactionToZcnsc(clientId, 100)
-	authorizerNode := GetNewAuthorizer(tr.PublicKey, clientId, "https://localhost:9876")
+	authorizerNode := NewAuthorizerInfo(tr.PublicKey, clientId, "https://localhost:9876")
 	_, _, _ = authorizerNode.Staking.DigPool(tr.Hash, tr)
 	return authorizerNode
 }

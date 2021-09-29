@@ -128,17 +128,17 @@ func Test_GlobalNodeEncodeAndDecode(t *testing.T) {
 
 func Test_EmptyAuthorizersShouldNotHaveAnyNode(t *testing.T) {
 	balances := MakeMockStateContext()
-	nodes, err := GetAuthorizerNodes(balances)
+	nodes, err := fetchAuthorizers(balances)
 	require.NoError(t, err)
 	require.NotNil(t, nodes)
-	require.Equal(t, 3, len(nodes.NodeMap))
+	require.Equal(t, 3, len(nodes.Nodes))
 }
 
 func Test_Authorizers_Should_Add_And_Return_And_UpdateAuthorizers(t *testing.T) {
-	authorizer := GetNewAuthorizer("public key", "id", "https://localhost:9876")
+	authorizer := NewAuthorizerInfo("public key", "id", "https://localhost:9876")
 	balances := MakeMockStateContext()
 
-	nodes, err := GetAuthorizerNodes(balances)
+	nodes, err := fetchAuthorizers(balances)
 	require.NoError(t, err)
 	err = nodes.AddAuthorizer(authorizer)
 	require.NoError(t, err, "must add authorizer")
@@ -148,7 +148,7 @@ func Test_Authorizers_Should_Add_And_Return_And_UpdateAuthorizers(t *testing.T) 
 }
 
 func Test_PublicKey(t *testing.T) {
-	pk := AuthorizerParameter{}
+	pk := Authorizer{}
 
 	err := pk.Decode(nil)
 	require.Error(t, err)
@@ -166,7 +166,7 @@ func Test_PublicKey(t *testing.T) {
 	bytes, err := json.Marshal(pk)
 	require.NoError(t, err)
 
-	expected := AuthorizerParameter{}
+	expected := Authorizer{}
 	err = expected.Decode(bytes)
 	require.NoError(t, err)
 	require.Equal(t, expected.PublicKey, pk.PublicKey)
@@ -197,12 +197,12 @@ func Test_ZcnLockingPool_ShouldBeSerializable(t *testing.T) {
 func Test_AuthorizerNode_ShouldBeSerializableWithTokenLock(t *testing.T) {
 	// Create authorizer node
 	tr := CreateDefaultTransactionToZcnsc()
-	node := GetNewAuthorizer(tr.PublicKey, tr.ClientID, "https://localhost:9876")
+	node := NewAuthorizerInfo(tr.PublicKey, tr.ClientID, "https://localhost:9876")
 	_, _, _ = node.Staking.DigPool(tr.Hash, tr)
 	node.Staking.ID = "11"
 
 	// Deserialize it into new instance
-	target := &AuthorizerNode{}
+	target := &AuthorizerInfo{}
 
 	err := target.Decode(node.Encode())
 	require.NoError(t, err)
@@ -214,7 +214,7 @@ func Test_AuthorizerNode_ShouldBeSerializableWithTokenLock(t *testing.T) {
 func Test_AuthorizersTreeShouldBeSerialized(t *testing.T) {
 	// Create authorizer node
 	tr := CreateDefaultTransactionToZcnsc()
-	node := GetNewAuthorizer(tr.PublicKey, tr.ClientID, "https://localhost:9876")
+	node := NewAuthorizerInfo(tr.PublicKey, tr.ClientID, "https://localhost:9876")
 	node.Staking.ID = "11"
 	node.Staking.Balance = 100
 
@@ -223,13 +223,13 @@ func Test_AuthorizersTreeShouldBeSerialized(t *testing.T) {
 
 	// Create authorizers nodes tree
 	balances := MakeMockStateContext()
-	tree, err := GetAuthorizerNodes(balances)
+	tree, err := fetchAuthorizers(balances)
 	require.NoError(t, err)
 	require.NotNil(t, tree)
-	require.NotNil(t, tree.NodeMap)
+	require.NotNil(t, tree.Nodes)
 
 	// Save authorizer node in the dictionary (nodes tree)
-	tree.NodeMap[node.ID] = node
+	tree.Nodes[node.ID] = node
 
 	// Serialize and deserialize nodes tree
 	target := &AuthorizerNodes{}
@@ -237,7 +237,7 @@ func Test_AuthorizersTreeShouldBeSerialized(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, target)
 
-	targetNode := target.NodeMap[node.ID]
+	targetNode := target.Nodes[node.ID]
 	require.NotNil(t, targetNode)
 	require.Equal(t, targetNode.ID, node.ID)
 	require.Equal(t, targetNode.URL, node.URL)
@@ -249,17 +249,17 @@ func Test_AuthorizersTreeShouldBeSerialized(t *testing.T) {
 func Test_Authorizers_NodeMap_ShouldBeInitializedAfterDeserializing (t *testing.T) {
 	// Create authorizers nodes tree
 	balances := MakeMockStateContext()
-	tree, err := GetAuthorizerNodes(balances)
+	tree, err := fetchAuthorizers(balances)
 	require.NoError(t, err)
 	require.NotNil(t, tree)
-	require.NotNil(t, tree.NodeMap)
+	require.NotNil(t, tree.Nodes)
 
 	// Serialize and deserialize nodes tree
 	target := &AuthorizerNodes{}
 	err = target.Decode(tree.Encode())
 	require.NoError(t, err)
 	require.NotNil(t, target)
-	require.NotNil(t, target.NodeMap)
+	require.NotNil(t, target.Nodes)
 }
 
 func createStateAndNodeAndAddNodeToState() (cstate.StateContextI, *GlobalNode, error) {
